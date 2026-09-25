@@ -26,6 +26,22 @@ import {
   quadrants,
   positionFor,
 } from "@/lib/tasks";
+import {
+  ageInfo,
+  Bin,
+  CalendarIcon,
+  CONFETTI,
+  dueInfo,
+  Flame,
+  FlameDefs,
+  Hourglass,
+  prefersReducedMotion,
+  Sparkle,
+  Sprout,
+} from "./card-status";
+
+const HEAT_CLASS = ["", "heat-soon", "heat-warm", "heat-hot", "heat-late"];
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function cleanLinks(items: Link[] = []) {
   return items
@@ -123,6 +139,21 @@ export default function Home() {
     space = useRef(false);
   tasksRef.current = tasks;
   viewRef.current = view;
+  // Animation state: which cards are mid-sprout / mid-completion / mid-toss.
+  const [sprouting, setSprouting] = useState<string[]>([]),
+    [completing, setCompleting] = useState<string[]>([]),
+    [tossing, setTossing] = useState<string[]>([]),
+    [confirmToss, setConfirmToss] = useState<Task | null>(null),
+    [bump, setBump] = useState(false),
+    [now, setNow] = useState(() => Date.now());
+  const cardEls = useRef(new Map<string, HTMLElement>()),
+    completedBtn = useRef<HTMLButtonElement>(null);
+  const animating = (id: string) =>
+    completing.includes(id) || tossing.includes(id);
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 5 * 60_000);
+    return () => clearInterval(tick);
+  }, []);
   function fit() {
     const r = viewport.current?.getBoundingClientRect();
     if (!r) return;
@@ -217,7 +248,7 @@ export default function Home() {
     const middle = e.button === 1;
     if (!middle && (e.target as HTMLElement).closest("button,a")) return;
     const pan = middle || !t || mode === "hand" || space.current;
-    if (!pan && !ready) return;
+    if (!pan && (!ready || animating(t!.id))) return;
     if (middle) e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     gesture.current = {
@@ -285,6 +316,7 @@ export default function Home() {
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!edit || !edit.title.trim()) return;
+    const isNew = !tasks.some((t) => t.id === edit.id);
     setBusy(true);
     try {
       await persist({
@@ -292,14 +324,125 @@ export default function Home() {
         title: edit.title.trim(),
         sources: cleanLinks(edit.sources),
         links: cleanLinks(edit.links),
+        ...(isNew ? { created_at: new Date().toISOString() } : {}),
       });
       setEdit(null);
       setError("");
+      if (isNew && !prefersReducedMotion()) {
+        setSprouting((s) => [...s, edit.id]);
+        setTimeout(
+          () => setSprouting((s) => s.filter((id) => id !== edit.id)),
+          1500,
+        );
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+  /** Check fills, confetti bursts, then the card flies into the Completed counter. */
+  async function complete(t: Task) {
+    if (animating(t.id)) return;
+    const el = cardEls.current.get(t.id),
+      target = completedBtn.current;
+    if (prefersReducedMotion() || !el || !target)
+      return change({ ...t, done: true });
+    setCompleting((c) => [...c, t.id]);
+    await wait(1050);
+    const from = el.getBoundingClientRect(),
+      to = target.getBoundingClientRect(),
+      scale = viewRef.current.scale;
+    const dx = (to.left + to.width / 2 - (from.left + from.width / 2)) / scale,
+      dy = (to.top + to.height / 2 - (from.top + from.height / 2)) / scale;
+    const fly = el.animate(
+      [
+        { transform: "none", opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.12)`, opacity: 0 },
+      ],
+      { duration: 520, easing: "cubic-bezier(.5,0,.8,.6)", fill: "forwards" },
+    );
+    await fly.finished;
+    try {
+      await persist({ ...t, done: true });
+      setBump(true);
+      setTimeout(() => setBump(false), 650);
+    } catch (e) {
+      fly.cancel();
+      setError((e as Error).message);
+    } finally {
+      setCompleting((c) => c.filter((id) => id !== t.id));
+    }
+  }
+  /** After confirmation: the card crumples into a paper ball and lands in a bin. */
+  async function toss(t: Task) {
+    setConfirmToss(null);
+    const el = cardEls.current.get(t.id);
+    if (prefersReducedMotion() || !el) {
+      try {
+        await persist(t, true);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      return;
+    }
+    setTossing((s) => [...s, t.id]);
+    // The bin sits just past the card's bottom-right corner (see .toss-bin).
+    const dx = el.offsetWidth / 2 + 44,
+      dy = el.offsetHeight / 2 - 10;
+    const ball = "#eef0f4";
+    const crumple = el.animate(
+      [
+        { offset: 0, transform: "none", borderRadius: "9px" },
+        { offset: 0.15, transform: "rotate(-3deg) scale(1.03)" },
+        {
+          offset: 0.4,
+          transform: "scale(.62,.5) rotate(12deg)",
+          borderRadius: "40px",
+        },
+        {
+          offset: 0.56,
+          transform: "scale(.24) rotate(40deg)",
+          borderRadius: "50%",
+          background: ball,
+        },
+        {
+          offset: 0.72,
+          transform: `translate(${dx * 0.5}px, -90px) scale(.2) rotate(160deg)`,
+          borderRadius: "50%",
+          background: ball,
+        },
+        {
+          offset: 0.9,
+          transform: `translate(${dx}px, ${dy - 24}px) scale(.16) rotate(300deg)`,
+          borderRadius: "50%",
+          background: ball,
+          opacity: 1,
+        },
+        {
+          offset: 1,
+          transform: `translate(${dx}px, ${dy}px) scale(.1) rotate(330deg)`,
+          borderRadius: "50%",
+          background: ball,
+          opacity: 0,
+        },
+      ],
+      { duration: 1250, easing: "cubic-bezier(.45,0,.55,1)", fill: "forwards" },
+    );
+    await crumple.finished;
+    await wait(350);
+    try {
+      await persist(t, true);
+    } catch (e) {
+      crumple.cancel();
+      setError((e as Error).message);
+    } finally {
+      setTossing((s) => s.filter((id) => id !== t.id));
+    }
+  }
+  /** Restart a task's hourglass once it has run out. */
+  function flip(t: Task) {
+    void change({ ...t, aged_from: new Date().toISOString() });
   }
   const actionsRef = useRef({ persist, ready });
   actionsRef.current = { persist, ready };
@@ -396,6 +539,7 @@ export default function Home() {
   const count = tasks.filter((t) => t.done).length;
   return (
     <main className="app">
+      <FlameDefs />
       <header className="topbar">
         <div className="brand">
           <img src="/favicon.svg" alt="" width={34} height={34} />
@@ -407,10 +551,14 @@ export default function Home() {
           {tasks.filter((t) => !t.done).length} tasks
         </div>
         <div className="header-actions">
-          <button className="plain" onClick={() => setCompleted(true)}>
+          <button
+            ref={completedBtn}
+            className="plain"
+            onClick={() => setCompleted(true)}
+          >
             <Check size={17} />
             <span>Completed</span>
-            <b>{count}</b>
+            <b className={bump ? "bump" : ""}>{count}</b>
           </button>
           <button className="primary" disabled={!ready} onClick={() => add()}>
             <Plus size={18} /> Add task
@@ -473,94 +621,204 @@ export default function Home() {
           ))}
           {tasks
             .filter((t) => !t.done)
-            .map((t) => (
-              <article
-                key={t.id}
-                className={`task-card card-q${t.q} ${dragging === t.id ? "dragging" : ""}`}
-                style={{
-                  left: t.x,
-                  top: t.y,
-                  zIndex: dragging === t.id ? 20 : 2,
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  start(e, t);
-                }}
-                tabIndex={0}
-                aria-label={`${t.title}. ${quadrants[t.q].name}. Press Enter to edit. Alt plus arrow keys moves between quadrants.`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") setEdit(t);
-                  if (
-                    e.altKey &&
-                    [
-                      "ArrowLeft",
-                      "ArrowRight",
-                      "ArrowUp",
-                      "ArrowDown",
-                    ].includes(e.key)
-                  ) {
-                    e.preventDefault();
-                    const col = t.q % 2,
-                      row = Math.floor(t.q / 2);
-                    const q =
-                      e.key === "ArrowLeft"
-                        ? row * 2
-                        : e.key === "ArrowRight"
-                          ? row * 2 + 1
-                          : e.key === "ArrowUp"
-                            ? col
-                            : col + 2;
-                    void change({
-                      ...t,
-                      q,
-                      ...positionFor(
+            .map((t) => {
+              const due = dueInfo(t.due, now),
+                age = ageInfo(t, now),
+                timeUp = !due && age.fraction >= 1;
+              const fx = sprouting.includes(t.id)
+                ? "sprouting"
+                : completing.includes(t.id)
+                  ? "completing"
+                  : tossing.includes(t.id)
+                    ? "tossing"
+                    : "";
+              return (
+                <article
+                  key={t.id}
+                  ref={(el) => {
+                    if (el) cardEls.current.set(t.id, el);
+                    else cardEls.current.delete(t.id);
+                  }}
+                  className={`task-card card-q${t.q} ${dragging === t.id ? "dragging" : ""} ${due ? HEAT_CLASS[due.heat] : ""} ${fx}`}
+                  style={{
+                    left: t.x,
+                    top: t.y,
+                    zIndex: dragging === t.id ? 20 : 2,
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    start(e, t);
+                  }}
+                  tabIndex={0}
+                  aria-label={`${t.title}. ${quadrants[t.q].name}. Press Enter to edit. Alt plus arrow keys moves between quadrants.`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setEdit(t);
+                    if (
+                      e.altKey &&
+                      [
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "ArrowUp",
+                        "ArrowDown",
+                      ].includes(e.key)
+                    ) {
+                      e.preventDefault();
+                      const col = t.q % 2,
+                        row = Math.floor(t.q / 2);
+                      const q =
+                        e.key === "ArrowLeft"
+                          ? row * 2
+                          : e.key === "ArrowRight"
+                            ? row * 2 + 1
+                            : e.key === "ArrowUp"
+                              ? col
+                              : col + 2;
+                      void change({
+                        ...t,
                         q,
-                        tasks.filter(
-                          (a) => a.q === q && !a.done && a.id !== t.id,
-                        ).length,
-                      ),
-                    });
-                  }
-                }}
-              >
-                <div className="card-top">
-                  <span>{t.due || ""}</span>
-                  <Grip size={16} />
-                </div>
-                <h4>{t.title}</h4>
-                {t.notes && <p>{t.notes}</p>}
-                <div className="card-bottom">
-                  <span className="card-links">
-                    {t.sources?.[0] && (
-                      <a
-                        href={t.sources[0].url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={t.sources[0].url}
+                        ...positionFor(
+                          q,
+                          tasks.filter(
+                            (a) => a.q === q && !a.done && a.id !== t.id,
+                          ).length,
+                        ),
+                      });
+                    }
+                  }}
+                >
+                  <div className="card-top">
+                    <div className="chips">
+                      {timeUp ? (
+                        <button
+                          type="button"
+                          className="chip chip-age time-up"
+                          title="Restart this task's hourglass"
+                          onClick={() => flip(t)}
+                        >
+                          <Hourglass fraction={1} />
+                          time is up · flip it?
+                        </button>
+                      ) : (
+                        age.visible && (
+                          <span
+                            className="chip chip-age"
+                            title={`Created ${age.long.replace(" old", " ago")}`}
+                          >
+                            <Hourglass fraction={age.fraction} />
+                            {due ? age.short : age.long}
+                          </span>
+                        )
+                      )}
+                      {due && (
+                        <span
+                          className={`chip chip-due due-${due.heat}`}
+                          title={`Due ${t.due}`}
+                        >
+                          <CalendarIcon />
+                          {due.text}
+                        </span>
+                      )}
+                    </div>
+                    <Grip size={16} />
+                  </div>
+                  {due?.heat === 4 && <Flame />}
+                  <h4>{t.title}</h4>
+                  {t.notes && <p>{t.notes}</p>}
+                  <div className="card-bottom">
+                    <span className="card-links">
+                      {t.sources?.[0] && (
+                        <a
+                          href={t.sources[0].url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={t.sources[0].url}
+                        >
+                          <Link2 size={13} />
+                          {t.sources[0].label}
+                        </a>
+                      )}
+                      {(t.sources?.length ?? 0) + (t.links?.length ?? 0) >
+                        (t.sources?.[0] ? 1 : 0) && (
+                        <em>
+                          +
+                          {(t.sources?.length ?? 0) +
+                            (t.links?.length ?? 0) -
+                            (t.sources?.[0] ? 1 : 0)}
+                        </em>
+                      )}
+                    </span>
+                    <span className="card-actions">
+                      <button
+                        className="card-trash"
+                        aria-label={`Delete ${t.title}`}
+                        onClick={() => setConfirmToss(t)}
                       >
-                        <Link2 size={13} />
-                        {t.sources[0].label}
-                      </a>
-                    )}
-                    {(t.sources?.length ?? 0) + (t.links?.length ?? 0) >
-                      (t.sources?.[0] ? 1 : 0) && (
-                      <em>
-                        +
-                        {(t.sources?.length ?? 0) +
-                          (t.links?.length ?? 0) -
-                          (t.sources?.[0] ? 1 : 0)}
-                      </em>
-                    )}
+                        <Trash2 size={14} />
+                      </button>
+                      <button
+                        className="card-check"
+                        aria-label={`Complete ${t.title}`}
+                        onClick={() => complete(t)}
+                      >
+                        <Check size={15} />
+                      </button>
+                    </span>
+                  </div>
+                  {fx === "completing" &&
+                    CONFETTI.map((c, i) => (
+                      <span
+                        key={i}
+                        className="confetti"
+                        style={
+                          {
+                            background: c.color,
+                            width: c.w,
+                            height: c.h,
+                            borderRadius: c.round ? "50%" : 2,
+                            animationDelay: `${0.45 + c.delay}s`,
+                            "--dx": `${c.dx}px`,
+                            "--dy": `${c.dy}px`,
+                            "--r": `${c.rot}deg`,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ))}
+                </article>
+              );
+            })}
+          {/* Effects that sit beside a card rather than inside it. */}
+          {tasks
+            .filter((t) => sprouting.includes(t.id) || tossing.includes(t.id))
+            .map((t) =>
+              sprouting.includes(t.id) ? (
+                <div
+                  key={`fx-${t.id}`}
+                  className="sprout-fx"
+                  style={{ left: t.x, top: t.y }}
+                  aria-hidden="true"
+                >
+                  <Sprout />
+                  <span className="spark s1">
+                    <Sparkle color="#2fbf8f" />
                   </span>
-                  <button
-                    aria-label={`Complete ${t.title}`}
-                    onClick={() => change({ ...t, done: true })}
-                  >
-                    <Check size={15} />
-                  </button>
+                  <span className="spark s2">
+                    <Sparkle color="#f5bf45" />
+                  </span>
+                  <span className="spark s3">
+                    <Sparkle color="#2fbf8f" />
+                  </span>
                 </div>
-              </article>
-            ))}
+              ) : (
+                <div
+                  key={`fx-${t.id}`}
+                  className="toss-bin"
+                  style={{ left: t.x, top: t.y }}
+                  aria-hidden="true"
+                >
+                  <Bin />
+                </div>
+              ),
+            )}
         </div>
       </div>
       <footer>
@@ -655,16 +913,10 @@ export default function Home() {
                     className="delete"
                     aria-label="Delete task"
                     disabled={busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      try {
-                        await persist(edit, true);
-                        setEdit(null);
-                      } catch (e) {
-                        setError((e as Error).message);
-                      } finally {
-                        setBusy(false);
-                      }
+                    onClick={() => {
+                      const saved = tasks.find((t) => t.id === edit.id);
+                      setEdit(null);
+                      if (saved) setConfirmToss(saved);
                     }}
                   >
                     <Trash2 size={17} />
@@ -680,6 +932,40 @@ export default function Home() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!confirmToss}
+        onOpenChange={(o) => {
+          if (!o) setConfirmToss(null);
+        }}
+      >
+        <DialogContent className="toss-dialog" showCloseButton={false}>
+          <div className="toss-icon" aria-hidden="true">
+            <Trash2 size={20} />
+          </div>
+          <DialogTitle>Toss this task?</DialogTitle>
+          <DialogDescription>
+            “{confirmToss?.title}” gets crumpled up and thrown away. This can’t
+            be undone.
+          </DialogDescription>
+          <div className="toss-actions">
+            <button
+              type="button"
+              className="keep"
+              autoFocus
+              onClick={() => setConfirmToss(null)}
+            >
+              Keep it
+            </button>
+            <button
+              type="button"
+              className="toss"
+              onClick={() => confirmToss && toss(confirmToss)}
+            >
+              Toss it
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={completed} onOpenChange={setCompleted}>

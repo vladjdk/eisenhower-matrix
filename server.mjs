@@ -32,7 +32,9 @@ function parseTask(b) {
   if (!Number.isInteger(b.q) || b.q < 0 || b.q > 3 || !isNum(b.x, 1760) || !isNum(b.y, 1460) || typeof b.done !== 'boolean' || !isDate(b.due)) return null;
   const sources = cleanLinks(b.sources), links = cleanLinks(b.links);
   if (sources === null || links === null) return null;
-  return { id: b.id, title: b.title.trim(), notes: b.notes, q: b.q, x: b.x, y: b.y, done: b.done, due: b.due, sources, links };
+  // aged_from restarts a task's hourglass ("flip it"); optional ISO timestamp.
+  if (b.aged_from !== undefined && (typeof b.aged_from !== 'string' || (b.aged_from && Number.isNaN(Date.parse(b.aged_from))))) return null;
+  return { id: b.id, title: b.title.trim(), notes: b.notes, q: b.q, x: b.x, y: b.y, done: b.done, due: b.due, sources, links, aged_from: b.aged_from };
 }
 
 function send(res, status, body, headers = {}) {
@@ -49,7 +51,7 @@ async function readJson(req) {
 async function api(req, res) {
   try {
     if (req.method === 'GET') {
-      const tasks = (await store.list()).map(({ created_at, updated_at, generated, ...t }) => t);
+      const tasks = (await store.list()).map(({ updated_at, generated, ...t }) => t);
       return send(res, 200, { tasks });
     }
     if (req.method === 'PUT') {

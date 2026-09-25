@@ -836,3 +836,455 @@ textarea {
   font-size: 12px;
   color: #687386;
 }
+
+/* ---------- Card status: age (hourglass) + deadline (heat) ---------- */
+.card-top {
+  align-items: center;
+  gap: 8px;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  letter-spacing: 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.card-top .chip svg {
+  opacity: 1;
+}
+button.chip {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chip-age {
+  background: #fbf1e1;
+  color: #8b5a3c;
+}
+.chip-age.time-up {
+  background: #f3dcb8;
+}
+.chip-age.time-up:hover {
+  background: #ecd0a2;
+}
+.time-up .hourglass {
+  animation: hg-wobble 2.8s ease-in-out infinite;
+}
+.due-0 {
+  background: #eef1f6;
+  color: #637081;
+}
+.due-1 {
+  background: #fff1c9;
+  color: #8a5d00;
+}
+.due-2 {
+  background: #ffe0c2;
+  color: #a4480a;
+}
+.due-3 {
+  background: #ff8a4c;
+  color: #fff;
+}
+.due-4 {
+  background: #e5484d;
+  color: #fff;
+}
+.task-card.heat-soon {
+  border-color: #f1dfa6;
+}
+.task-card.heat-warm {
+  border-color: #f6c393;
+  box-shadow: 0 6px 18px #ff8c3c2e;
+}
+.task-card.heat-hot {
+  border-color: #ff9d66;
+  animation: heat-glow 1.6s ease-in-out infinite;
+}
+.task-card.heat-late {
+  border-color: #e5484d;
+  background: #fff7f7;
+  box-shadow:
+    0 0 0 3px #e5484d24,
+    0 8px 22px #e5484d38;
+  animation: heat-jitter 2.4s ease-in-out infinite;
+}
+.task-card.dragging {
+  animation: none;
+}
+.card-flame {
+  position: absolute;
+  top: -24px;
+  right: 22px;
+  transform-origin: 50% 100%;
+  animation: flick 0.7s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes heat-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 #ff7a3c00,
+      0 6px 18px #ff7a3c38;
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px #ff7a3c2e,
+      0 10px 26px #ff7a3c66;
+  }
+}
+@keyframes heat-jitter {
+  0%,
+  86%,
+  100% {
+    transform: none;
+  }
+  88% {
+    transform: translateX(-2px) rotate(-1deg);
+  }
+  91% {
+    transform: translateX(2px) rotate(1deg);
+  }
+  94% {
+    transform: translateX(-1px);
+  }
+  97% {
+    transform: translateX(1px);
+  }
+}
+@keyframes flick {
+  0%,
+  100% {
+    transform: scale(1, 1) rotate(-2deg);
+  }
+  25% {
+    transform: scale(0.93, 1.12) rotate(2deg);
+  }
+  50% {
+    transform: scale(1.05, 0.94) rotate(-1deg);
+  }
+  75% {
+    transform: scale(0.97, 1.08) rotate(3deg);
+  }
+}
+@keyframes hg-wobble {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0);
+  }
+  78% {
+    transform: rotate(-14deg);
+  }
+  86% {
+    transform: rotate(10deg);
+  }
+  92% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* ---------- Card actions: bin + done ---------- */
+.card-bottom > span.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.card-bottom .card-trash {
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #9aa4b2;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.task-card:hover .card-trash,
+.task-card:focus-within .card-trash {
+  opacity: 1;
+}
+@media (hover: none) {
+  .card-bottom .card-trash {
+    opacity: 1;
+  }
+}
+.card-bottom .card-trash:hover {
+  background: #fdecec;
+  color: #d63c42;
+}
+
+/* ---------- Add: sprout ---------- */
+.task-card.sprouting {
+  animation: bloom 0.6s cubic-bezier(0.3, 0.9, 0.4, 1) 0.45s both;
+}
+.sprout-fx,
+.toss-bin {
+  position: absolute;
+  width: 274px;
+  height: 164px;
+  pointer-events: none;
+  z-index: 25;
+}
+.sprout-fx .sprout {
+  position: absolute;
+  left: 117px;
+  bottom: -4px;
+  transform-origin: 50% 100%;
+  animation:
+    grow 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both,
+    sprout-out 0.3s ease-in 0.95s forwards;
+}
+.sprout-fx .leaf {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: leaf 0.3s ease-out 0.3s both;
+}
+.sprout-fx .spark {
+  position: absolute;
+  animation: twinkle 0.7s ease-out both;
+}
+.sprout-fx .s1 {
+  left: -14px;
+  top: -12px;
+  animation-delay: 1s;
+}
+.sprout-fx .s2 {
+  right: -14px;
+  top: -16px;
+  animation-delay: 1.08s;
+}
+.sprout-fx .s3 {
+  right: -10px;
+  bottom: -10px;
+  animation-delay: 1.02s;
+}
+@keyframes bloom {
+  0% {
+    clip-path: circle(0% at 50% 100%);
+    translate: 0 8px;
+  }
+  100% {
+    clip-path: circle(150% at 50% 100%);
+    translate: 0 0;
+  }
+}
+@keyframes grow {
+  0% {
+    transform: scaleY(0);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes sprout-out {
+  to {
+    opacity: 0;
+    transform: scale(0.6) translateY(10px);
+  }
+}
+@keyframes leaf {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes twinkle {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.25) rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) rotate(90deg);
+  }
+}
+
+/* ---------- Complete: confetti, strike, fly to counter ---------- */
+.completing .card-bottom .card-check {
+  animation: check-fill 0.35s ease-out 0.1s both;
+}
+.completing h4 {
+  text-decoration: line-through 2px;
+  animation: strike 0.35s ease-out 0.6s both;
+}
+.confetti {
+  position: absolute;
+  right: 27px;
+  bottom: 19px;
+  opacity: 0;
+  pointer-events: none;
+  animation: confetti 1s cubic-bezier(0.1, 0.75, 0.35, 1) both;
+}
+.plain b.bump {
+  display: inline-block;
+  animation: bump 0.6s ease-out;
+}
+@keyframes check-fill {
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    background: #2fbf8f;
+    border-color: #2fbf8f;
+    color: #fff;
+    transform: none;
+  }
+}
+@keyframes strike {
+  from {
+    text-decoration-color: transparent;
+  }
+  to {
+    text-decoration-color: #9aa4b2;
+    color: #9aa4b2;
+  }
+}
+@keyframes confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0) scale(0.5);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1);
+  }
+}
+@keyframes bump {
+  40% {
+    transform: scale(1.5);
+    background: #2fbf8f;
+    color: #fff;
+  }
+}
+
+/* ---------- Delete: confirm, crumple, bin ---------- */
+.task-card.tossing {
+  pointer-events: none;
+}
+.task-card.tossing > * {
+  opacity: 0;
+  transition: opacity 0.2s ease-out 0.25s;
+}
+.toss-bin svg {
+  position: absolute;
+  left: 296px;
+  top: 140px;
+  transform-origin: 50% 100%;
+  animation:
+    bin-in 0.25s ease-out both,
+    bin-wobble 0.45s ease-out 1.3s,
+    bin-out 0.25s ease-in 1.55s forwards;
+}
+.toss-bin .bin-lid {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: bin-lid 0.6s ease-in-out 0.85s both;
+}
+@keyframes bin-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+}
+@keyframes bin-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+@keyframes bin-wobble {
+  25% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+  75% {
+    transform: rotate(-2deg);
+  }
+}
+@keyframes bin-lid {
+  0%,
+  100% {
+    transform: none;
+  }
+  30%,
+  70% {
+    transform: translate(-3px, -6px) rotate(-22deg);
+  }
+}
+.toss-dialog {
+  max-width: 380px !important;
+  padding: 26px 26px 20px !important;
+  border-radius: 16px !important;
+  gap: 10px !important;
+}
+.toss-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fdecec;
+  color: #d63c42;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.toss-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.toss-actions button {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.toss-actions .keep {
+  border: 1px solid #d7dde6;
+  background: #fff;
+  color: #2b3642;
+}
+.toss-actions .keep:hover {
+  background: #f4f6f9;
+}
+.toss-actions .toss {
+  border: 0;
+  background: #d63c42;
+  color: #fff;
+}
+.toss-actions .toss:hover {
+  background: #bf2f35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-card.heat-hot,
+  .task-card.heat-late,
+  .card-flame,
+  .time-up .hourglass {
+    animation: none;
+  }
+}
