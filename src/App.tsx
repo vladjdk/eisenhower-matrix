@@ -12,6 +12,7 @@ import {
   Trash2,
   Link2,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -39,9 +40,22 @@ import {
   Sparkle,
   Sprout,
 } from "./card-status";
+import {
+  DoneBadge,
+  DoneCard,
+  EmptyDone,
+  groupDone,
+  whenDone,
+} from "./done-list";
 
 const HEAT_CLASS = ["", "heat-soon", "heat-warm", "heat-hot", "heat-late"];
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Local YYYY-MM-DD for today plus `offset` days. */
+function isoDay(offset: number, now: number) {
+  const d = new Date(now);
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function cleanLinks(items: Link[] = []) {
   return items
@@ -70,7 +84,11 @@ function LinkEditor({
   return (
     <div className="link-editor">
       <div className="link-head">
-        <span>{title}</span>
+        <span className="field-label">
+          <Link2 size={14} />
+          {title}
+          {items.length > 0 && <em>{items.length}</em>}
+        </span>
         <button
           type="button"
           onClick={() => onChange([...items, { label: "", url: "" }])}
@@ -145,6 +163,7 @@ export default function Home() {
     [tossing, setTossing] = useState<string[]>([]),
     [confirmToss, setConfirmToss] = useState<Task | null>(null),
     [bump, setBump] = useState(false),
+    [openDone, setOpenDone] = useState<string | null>(null),
     [now, setNow] = useState(() => Date.now());
   const cardEls = useRef(new Map<string, HTMLElement>()),
     completedBtn = useRef<HTMLButtonElement>(null);
@@ -316,11 +335,22 @@ export default function Home() {
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!edit || !edit.title.trim()) return;
-    const isNew = !tasks.some((t) => t.id === edit.id);
+    const saved = tasks.find((t) => t.id === edit.id),
+      isNew = !saved;
+    // Picking a different quadrant in the editor moves the card to that quadrant's next free slot.
+    const place =
+      !saved || saved.q !== edit.q
+        ? positionFor(
+            edit.q,
+            tasks.filter((t) => t.q === edit.q && !t.done && t.id !== edit.id)
+              .length,
+          )
+        : {};
     setBusy(true);
     try {
       await persist({
         ...edit,
+        ...place,
         title: edit.title.trim(),
         sources: cleanLinks(edit.sources),
         links: cleanLinks(edit.links),
@@ -346,8 +376,9 @@ export default function Home() {
     if (animating(t.id)) return;
     const el = cardEls.current.get(t.id),
       target = completedBtn.current;
-    if (prefersReducedMotion() || !el || !target)
-      return change({ ...t, done: true });
+    // The server stamps done_at too; setting it here keeps the done list current without a reload.
+    const done = { ...t, done: true, done_at: new Date().toISOString() };
+    if (prefersReducedMotion() || !el || !target) return change(done);
     setCompleting((c) => [...c, t.id]);
     await wait(1050);
     const from = el.getBoundingClientRect(),
@@ -364,7 +395,7 @@ export default function Home() {
     );
     await fly.finished;
     try {
-      await persist({ ...t, done: true });
+      await persist(done);
       setBump(true);
       setTimeout(() => setBump(false), 650);
     } catch (e) {
@@ -859,79 +890,188 @@ export default function Home() {
         }}
       >
         <DialogContent
-          className="task-dialog note-editor"
+          className="editor gap-0 overflow-hidden p-0 sm:max-w-[580px]"
           aria-describedby={undefined}
+          showCloseButton={false}
         >
-          <DialogTitle className="sr-only">Edit note</DialogTitle>
-          {edit && (
-            <form onSubmit={saveEdit}>
-              <input
-                className="note-title"
-                aria-label="Task title"
-                autoFocus
-                required
-                maxLength={160}
-                value={edit.title}
-                onChange={(e) => setEdit({ ...edit, title: e.target.value })}
-                placeholder="Untitled task"
-              />
-              <textarea
-                className="note-body"
-                aria-label="Task notes"
-                maxLength={2000}
-                value={edit.notes}
-                onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
-                placeholder="Add a note…"
-              />
-              <label className="note-date">
-                Date
-                <input
-                  type="date"
-                  value={edit.due}
-                  onChange={(e) => setEdit({ ...edit, due: e.target.value })}
-                />
-              </label>
-              <LinkEditor
-                title="Sources"
-                items={edit.sources}
-                onChange={(sources) => setEdit({ ...edit, sources })}
-              />
-              <LinkEditor
-                title="Links"
-                items={edit.links}
-                onChange={(links) => setEdit({ ...edit, links })}
-              />
-              {error && (
-                <p role="alert" className="form-error">
-                  {error}
-                </p>
-              )}
-              <div className="form-actions">
-                {tasks.some((t) => t.id === edit.id) && (
-                  <button
-                    type="button"
-                    className="delete"
-                    aria-label="Delete task"
-                    disabled={busy}
-                    onClick={() => {
-                      const saved = tasks.find((t) => t.id === edit.id);
-                      setEdit(null);
-                      if (saved) setConfirmToss(saved);
-                    }}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  className="primary"
-                  disabled={busy || !edit.title.trim()}
+          {edit &&
+            (() => {
+              const saved = tasks.find((t) => t.id === edit.id);
+              const age = saved ? ageInfo(saved, now) : null;
+              return (
+                <form
+                  onSubmit={saveEdit}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      e.currentTarget.requestSubmit();
+                    }
+                  }}
                 >
-                  {busy ? "Saving…" : "Done"}
-                </button>
-              </div>
-            </form>
-          )}
+                  <div className={`editor-band band-q${edit.q}`}>
+                    <div
+                      className="quad-picker"
+                      role="radiogroup"
+                      aria-label="Quadrant"
+                    >
+                      {quadrants.map((q, i) => (
+                        <button
+                          key={q.name}
+                          type="button"
+                          role="radio"
+                          aria-checked={edit.q === i}
+                          className={`qp qp-${i} ${edit.q === i ? "on" : ""}`}
+                          onClick={() => setEdit({ ...edit, q: i })}
+                        >
+                          <i />
+                          {q.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="editor-close"
+                      aria-label="Close"
+                      disabled={busy}
+                      onClick={() => setEdit(null)}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="editor-body">
+                    <DialogTitle className="sr-only">
+                      {saved ? "Edit task" : "New task"}
+                    </DialogTitle>
+                    <input
+                      className="editor-title"
+                      aria-label="Task title"
+                      autoFocus
+                      required
+                      maxLength={160}
+                      value={edit.title}
+                      onChange={(e) =>
+                        setEdit({ ...edit, title: e.target.value })
+                      }
+                      placeholder="What needs doing?"
+                    />
+                    <p className="editor-hint">{quadrants[edit.q].hint}</p>
+                    <textarea
+                      className="editor-notes"
+                      aria-label="Task notes"
+                      maxLength={2000}
+                      value={edit.notes}
+                      onChange={(e) =>
+                        setEdit({ ...edit, notes: e.target.value })
+                      }
+                      placeholder="Add a note, a plan, a pep talk…"
+                    />
+                    <div className="editor-field">
+                      <span className="field-label">
+                        <CalendarIcon /> Due
+                      </span>
+                      <div className="due-picker">
+                        <input
+                          type="date"
+                          aria-label="Due date"
+                          value={edit.due}
+                          onChange={(e) =>
+                            setEdit({ ...edit, due: e.target.value })
+                          }
+                        />
+                        {[
+                          ["Today", 0],
+                          ["Tomorrow", 1],
+                          ["Next week", 7],
+                        ].map(([label, offset]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            className={
+                              edit.due === isoDay(offset as number, now)
+                                ? "on"
+                                : ""
+                            }
+                            onClick={() =>
+                              setEdit({
+                                ...edit,
+                                due: isoDay(offset as number, now),
+                              })
+                            }
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        {edit.due && (
+                          <button
+                            type="button"
+                            className="clear"
+                            aria-label="Clear due date"
+                            onClick={() => setEdit({ ...edit, due: "" })}
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <LinkEditor
+                      title="Sources"
+                      items={edit.sources}
+                      onChange={(sources) => setEdit({ ...edit, sources })}
+                    />
+                    <LinkEditor
+                      title="Links"
+                      items={edit.links}
+                      onChange={(links) => setEdit({ ...edit, links })}
+                    />
+                    {error && (
+                      <p role="alert" className="form-error">
+                        {error}
+                      </p>
+                    )}
+                  </div>
+                  <div className="editor-foot">
+                    {saved ? (
+                      <button
+                        type="button"
+                        className="editor-toss"
+                        disabled={busy}
+                        onClick={() => {
+                          setEdit(null);
+                          setConfirmToss(saved);
+                        }}
+                      >
+                        <Trash2 size={15} /> Toss
+                      </button>
+                    ) : null}
+                    {age && (
+                      <span className="editor-age">
+                        <Hourglass fraction={age.fraction} />
+                        {age.days < 1
+                          ? "Created today"
+                          : `Created ${age.long.replace(" old", " ago")}`}
+                      </span>
+                    )}
+                    <span className="editor-spacer" />
+                    <button
+                      type="button"
+                      className="editor-cancel"
+                      disabled={busy}
+                      onClick={() => setEdit(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="primary"
+                      disabled={busy || !edit.title.trim()}
+                      title="Save (⌘ Enter)"
+                    >
+                      {busy ? "Saving…" : saved ? "Done" : "Add task"}
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
         </DialogContent>
       </Dialog>
       <Dialog
@@ -969,28 +1109,111 @@ export default function Home() {
         </DialogContent>
       </Dialog>
       <Dialog open={completed} onOpenChange={setCompleted}>
-        <DialogContent>
-          <DialogTitle>Completed tasks</DialogTitle>
-          <DialogDescription>
-            {count
-              ? `${count} things off your plate.`
-              : "Your finished tasks will appear here."}
-          </DialogDescription>
-          <div className="completed-list">
-            {tasks
-              .filter((t) => t.done)
-              .map((t) => (
-                <div key={t.id}>
-                  <span>{t.title}</span>
-                  <button
-                    aria-label={`Restore ${t.title}`}
-                    onClick={() => change({ ...t, done: false })}
-                  >
-                    <RotateCcw size={17} />
-                  </button>
-                </div>
-              ))}
+        <DialogContent className="done-dialog">
+          <div className="done-head">
+            <DoneBadge />
+            <div>
+              <DialogTitle>Done &amp; dusted</DialogTitle>
+              <DialogDescription>
+                {count === 0
+                  ? "Nothing crossed off yet."
+                  : count === 1
+                    ? "1 thing off your plate."
+                    : `${count} things off your plate.`}
+              </DialogDescription>
+            </div>
           </div>
+          {count > 0 && (
+            <div className="done-tally">
+              {quadrants.map((q, i) => {
+                const n = tasks.filter((t) => t.done && t.q === i).length;
+                return (
+                  n > 0 && (
+                    <span key={q.name} className={`tally tally-q${i}`}>
+                      <i />
+                      {q.name} <b>{n}</b>
+                    </span>
+                  )
+                );
+              })}
+            </div>
+          )}
+          {count === 0 ? (
+            <div className="done-empty">
+              <EmptyDone />
+              <p>Your first win lands here, with a little confetti.</p>
+            </div>
+          ) : (
+            <div className="completed-list">
+              {groupDone(
+                tasks.filter((t) => t.done),
+                now,
+              ).map((g) => (
+                <section key={g.label}>
+                  <h3>{g.label}</h3>
+                  {g.items.map((t, i) => (
+                    <div
+                      key={t.id}
+                      className={`done-item ${openDone === t.id ? "open" : ""}`}
+                      style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+                    >
+                      <div className="done-row">
+                        <button
+                          type="button"
+                          className="done-toggle"
+                          aria-expanded={openDone === t.id}
+                          aria-controls={`done-card-${t.id}`}
+                          onClick={() =>
+                            setOpenDone((o) => (o === t.id ? null : t.id))
+                          }
+                        >
+                          <span className="done-check" aria-hidden="true">
+                            <Check size={13} strokeWidth={3} />
+                          </span>
+                          <span className="done-text">
+                            <span className="done-title">{t.title}</span>
+                            <span className="done-meta">
+                              <i className={`dot dot-q${t.q}`} />
+                              {quadrants[t.q].name}
+                              {t.done_at && <> · {whenDone(t.done_at, now)}</>}
+                            </span>
+                          </span>
+                          <ChevronDown
+                            size={16}
+                            className="done-chevron"
+                            aria-hidden="true"
+                          />
+                        </button>
+                        <button
+                          className="put-back"
+                          aria-label={`Put ${t.title} back on the board`}
+                          onClick={async () => {
+                            await change({ ...t, done: false, done_at: "" });
+                            if (!prefersReducedMotion()) {
+                              setSprouting((s) => [...s, t.id]);
+                              setTimeout(
+                                () =>
+                                  setSprouting((s) =>
+                                    s.filter((id) => id !== t.id),
+                                  ),
+                                1500,
+                              );
+                            }
+                          }}
+                        >
+                          <RotateCcw size={14} />
+                          Put back
+                        </button>
+                      </div>
+                      {openDone === t.id && (
+                        <DoneCard task={t} id={`done-card-${t.id}`} />
+                      )}
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </main>
