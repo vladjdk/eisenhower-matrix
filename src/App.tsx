@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Minus, Maximize, MousePointer2, Hand, Check, Grip, X, RotateCcw, Trash2, Link2, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
