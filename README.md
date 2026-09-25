@@ -46,10 +46,14 @@ A small secret: the more you look after **Schedule**, the quieter **Do first** g
 ## Up close
 
 <p align="center">
-  <img alt="Editing a card: title, notes, a date, and a list of sources and links" src="docs/assets/screenshot-note.png" width="560">
+  <img alt="Editing a card: quadrant picker, title, notes, a due date with quick picks, and a list of sources" src="docs/assets/screenshot-note.png" width="440">
+  &nbsp;
+  <img alt="The Done and dusted list: finished tasks grouped by day, one opened to show its original card and how long it took" src="docs/assets/screenshot-done.png" width="380">
 </p>
 
-Click any card to open it. Write as much or as little as you like, add a date, and keep the links you need right next to the task.
+Click any card to open it. Write as much or as little as you like, pick a date in one tap, and keep the links you need right next to the task. Deadlines warm up from grey to red as they get close (overdue ones catch a little fire), and a tiny hourglass keeps track of how long a task has been hanging around.
+
+Tick something off and it bursts into confetti and flies into **Done & dusted**, where you can open any finished task to see the original card, whether it was on time, and how long it took. Changed your mind? **Put back** plants it on the board again.
 
 ## Where do my tasks go?
 
