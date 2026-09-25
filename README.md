@@ -2,6 +2,8 @@
 
 A private, drag-and-drop Eisenhower board that runs on your own machine and keeps every task in a single CSV file.
 
+![Focus board with sample tasks in each quadrant](docs/screenshot.png)
+
 | | Urgent | Not urgent |
 |---|---|---|
 | **Important** | **Do first**: important and time-sensitive | **Schedule**: protect time for meaningful work |
