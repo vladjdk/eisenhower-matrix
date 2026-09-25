@@ -1,115 +1,85 @@
-# Focus — Eisenhower Matrix
+<div align="center">
 
-A private, drag-and-drop Eisenhower board that runs on your own machine and keeps every task in a single CSV file.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <img alt="Focus: four little boxes for a calmer brain" src="docs/assets/logo.svg" width="420">
+</picture>
 
-![Focus board with sample tasks in each quadrant](docs/screenshot.png)
+**A cozy drag-and-drop board for sorting your to-dos into what matters now, what matters later, and what can quietly float away.**
 
-| | Urgent | Not urgent |
-|---|---|---|
-| **Important** | **Do first**: important and time-sensitive | **Schedule**: protect time for meaningful work |
-| **Not important** | **Delegate**: keep it moving without doing it all | **Let go**: not everything needs your attention |
+![Runs on your own computer](https://img.shields.io/badge/runs_on-your_own_computer-243cef?style=flat-square) ![Saves to one CSV file](https://img.shields.io/badge/saves_to-one_CSV_file-2fbf8f?style=flat-square) ![No account needed](https://img.shields.io/badge/account-not_needed-f5bf45?style=flat-square) ![The cloud is not invited](https://img.shields.io/badge/the_cloud-not_invited-8b95a5?style=flat-square)
 
-## Features
+</div>
 
-- Drag cards between quadrants; pan, zoom and reset the canvas
-- Per-task notes, due date, completion toggle, and lists of sources and links
-- Keyboard support for moving and opening cards
-- Everything saved to `data/tasks.csv`, one row per task, which you can open in Numbers, Excel or a text editor
+<br>
 
-The board starts empty. No task data ships with this repo, and `data/` is git-ignored.
+![The Focus board with sample tasks sorted into four colorful quadrants](docs/assets/screenshot.png)
 
-## Quick start
+## What is this?
 
-Requires Node.js `>=22.12` (for the build; the server itself has no dependencies).
+You know that feeling when everything on your list is shouting at once? Focus is a big, calm canvas with four boxes on it. You drop each task into the box where it belongs, and suddenly the shouting turns into a plan.
+
+It's based on the **Eisenhower matrix**, a very old and very good trick: ask two questions about every task (*is it urgent?* and *is it important?*) and the answer tells you what to do with it.
+
+- **Drag cards around** like sticky notes. Pan and zoom the canvas as much as you like.
+- **Jot things down**: every card has room for notes, a due date, and links to whatever you need.
+- **Tick things off** and watch them move to your "Completed" pile.
+- **Keyboard friendly**: <kbd>Enter</kbd> opens a card, <kbd>Alt</kbd> + arrow keys hop it to another box.
+- **Your tasks are just a spreadsheet.** Everything lives in one plain `tasks.csv` file on your computer.
+
+## The four boxes
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/quadrants-dark.svg">
+  <img alt="The four quadrants. Do first: urgent and important. Schedule: important but not urgent. Delegate: urgent but less important. Let go: neither." src="docs/assets/quadrants.svg" width="880">
+</picture>
+</p>
+
+- **Do first**: urgent *and* important. The fire is real; grab the extinguisher.
+- **Schedule**: important, not urgent. This is where the good stuff lives, so give it a real slot on the calendar before it turns into a fire.
+- **Delegate**: urgent, but not really yours. Hand it off, automate it, or do the tiniest version.
+- **Let go**: neither. Permission granted to not do it. It's fine. Really.
+
+A small secret: the more you look after **Schedule**, the quieter **Do first** gets.
+
+## Up close
+
+<p align="center">
+  <img alt="Editing a card: title, notes, a date, and a list of sources and links" src="docs/assets/screenshot-note.png" width="560">
+</p>
+
+Click any card to open it. Write as much or as little as you like, add a date, and keep the links you need right next to the task.
+
+## Where do my tasks go?
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/how-it-works-dark.svg">
+  <img alt="You use the board in your browser, it saves every change to one tasks.csv file on your computer, and you can open that file in Numbers or Excel. Nothing goes to the cloud." src="docs/assets/how-it-works.svg" width="880">
+</picture>
+</p>
+
+Nowhere far. Focus runs on your own computer and saves every change to a single file, `data/tasks.csv`. No sign-up, no sync server, nobody peeking. Want to see your tasks as a spreadsheet? Open the file in Numbers or Excel. Want a backup? Copy the file. That's the whole story.
+
+## Get it running
+
+You'll need [Node.js](https://nodejs.org) 22.12 or newer. Then, from this folder:
 
 ```sh
 npm install
 npm run build
-npm start              # http://127.0.0.1:5180
+npm run service:install
 ```
 
-For development with hot reload, use `npm run dev` (same port, same data file).
+Now open **http://127.0.0.1:5180** and bookmark it. On a Mac, that last command keeps Focus running quietly in the background: it starts when you log in and picks itself back up if it ever trips. Your board is always one bookmark away.
 
-## Your data
+Just want to try it once? Use `npm start` instead of `service:install`.
 
-All tasks live in `data/tasks.csv`:
+## The nerdy bits
 
-| column | meaning |
-|---|---|
-| `id` | unique id (any string; leave blank on a hand-added row and one is generated) |
-| `title` | task title |
-| `quadrant` | `Do first`, `Schedule`, `Delegate` or `Let go` |
-| `done` | `true` / `false` (`yes`, `1` and `x` also count as done) |
-| `due` | `YYYY-MM-DD` or blank |
-| `notes` | free text, may span lines |
-| `sources`, `links` | JSON list of `{"label","url"}` |
-| `x`, `y` | card position on the canvas |
-| `created_at`, `updated_at` | ISO timestamps, set by the server |
+Other ports, a different data file, Linux, hot-reload development, the CSV column reference and backups: it's all in **[docs/SETUP.md](docs/SETUP.md)**.
 
-- The file is re-read on every page load, so hand edits show up after a refresh. Avoid editing while the board is open in a browser, or the next save from the page may overwrite your edit.
-- Every save writes atomically and first copies the previous version to `data/tasks.csv.bak`.
-- **Backups:** copy the file anywhere, or point the board at a synced folder:
-  `DATA_FILE=~/Library/Mobile\ Documents/com~apple~CloudDocs/focus/tasks.csv npm start`
+<br>
 
-## Run it all the time (macOS)
-
-A per-user LaunchAgent starts the board at login and restarts it if it crashes.
-
-```sh
-npm install && npm run build
-npm run service:install        # installs ~/Library/LaunchAgents/local.eisenhower-matrix.plist and starts it
-```
-
-Then bookmark http://127.0.0.1:5180.
-
-| command | what it does |
-|---|---|
-| `npm run service:status` | show state and PID |
-| `npm run service:logs` | tail `logs/server.log` |
-| `npm run service:restart` | restart (do this after `git pull && npm run build`) |
-| `npm run service:uninstall` | stop and remove the LaunchAgent (data is untouched) |
-
-Options are read at install time; re-run `service:install` to change them:
-
-```sh
-PORT=5180 DATA_FILE=/path/to/tasks.csv NODE=/path/to/node npm run service:install
-```
-
-`NODE` defaults to whatever `node` is on your `PATH` when you install. If you use nvm and later remove that Node version, reinstall the service.
-
-### Linux (systemd)
-
-```ini
-# ~/.config/systemd/user/eisenhower-matrix.service
-[Unit]
-Description=Eisenhower matrix board
-
-[Service]
-WorkingDirectory=/path/to/eisenhower-matrix
-ExecStart=/usr/bin/node server.mjs
-Environment=PORT=5180
-Restart=always
-
-[Install]
-WantedBy=default.target
-```
-
-```sh
-systemctl --user enable --now eisenhower-matrix
-```
-
-## Configuration
-
-| env var | default | |
-|---|---|---|
-| `PORT` | `5180` | |
-| `HOST` | `127.0.0.1` | loopback only; set `0.0.0.0` to expose on your network (there is no auth) |
-| `DATA_FILE` | `data/tasks.csv` | relative paths resolve from the repo root |
-
-## Layout
-
-- `server.mjs`: zero-dependency Node server that serves the built app and `GET / PUT / DELETE /api/tasks`
-- `lib/store.mjs`: CSV read/write, serialized so concurrent saves never clobber each other
-- `lib/tasks.ts`: task types, quadrant definitions, card placement
-- `src/App.tsx`: the board UI (React 19, Tailwind 4, shadcn/ui dialog)
-- `scripts/service.sh`: macOS LaunchAgent install/uninstall
+<p align="center"><sub>Made with care for people with too many tabs open.</sub></p>
